@@ -19,8 +19,10 @@ FROM quay.io/fedora-ostree-desktops/sway-atomic:44
 
 # --- 1. Repositories -------------------------------------------------------
 # RPM Fusion (free + nonfree) and Terra, matching what this laptop has
-# layered via rpm-ostree. Vivaldi and Docker CE repo *files* are copied
-# verbatim from the source laptop's /etc/yum.repos.d.
+# layered via rpm-ostree. The Vivaldi repo *file* is copied verbatim from
+# the source laptop's /etc/yum.repos.d. (Docker CE's repo is deliberately
+# not added — podman/toolbox are the only container runtime on this
+# machine; see step 3 below.)
 RUN set -eux; \
     FEDORA_VER="$(rpm -E %fedora)"; \
     dnf -y install \
@@ -32,7 +34,6 @@ RUN set -eux; \
     dnf clean all
 
 COPY files/etc/yum.repos.d/vivaldi.repo /etc/yum.repos.d/vivaldi.repo
-COPY files/etc/yum.repos.d/docker-ce.repo /etc/yum.repos.d/docker-ce.repo
 
 # Same repo priorities as the source laptop (there, set at runtime via
 # `dnf config-manager --save --setopt=...`, which is why they show up as
@@ -83,11 +84,6 @@ RUN dnf -y install yazi akmod-xpadneo && dnf clean all
 # Vivaldi (see step 4 for the /opt relocation this needs)
 RUN dnf -y install vivaldi-stable && dnf clean all
 
-# Docker CE (installed, same as the source laptop, but left disabled —
-# podman/toolbox remain the enabled container runtime; see step 6)
-RUN dnf -y install docker-ce docker-ce-cli containerd.io docker-compose-plugin \
-    && dnf clean all
-
 # Steam + Deluge as native packages, replacing every flatpak app the source
 # laptop had (Steam, Pithos, Obsidian, Deluge, Fedora Media Writer,
 # Nicotine+): Steam and Deluge are kept, native; the rest are dropped
@@ -101,8 +97,10 @@ RUN dnf -y install deluge \
 
 # Explicitly NOT installed here, per request: `code` (VS Code), `zed`, the
 # mp3 taggers (beets is pip-user only on the source laptop and is likewise
-# not reinstalled — see migrate/pip-user.txt), and every flatpak app other
-# than the two above.
+# not reinstalled — see migrate/pip-user.txt), every flatpak app other than
+# the two above, and Docker CE (docker-ce/docker-ce-cli/containerd.io/
+# docker-compose-plugin) — podman/toolbox are the only container runtime
+# here, unlike the source laptop which has both installed.
 
 # --- 4. Vivaldi /opt relocation --------------------------------------------
 # /opt is a symlink to /var/opt in bootc images, and unlike /usr, a fresh
@@ -160,11 +158,12 @@ COPY files/usr/share/sddm/themes/custom-theme /usr/share/sddm/themes/custom-them
 RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 
 # --- 8. Services -------------------------------------------------------------
-# No custom services to enable: docker/containerd stay disabled, same as
-# the source laptop, and bootc-fetch-apply-updates.timer stays disabled too
-# — the source laptop's rpm-ostree AutomaticUpdatePolicy is "stage" but its
-# timer is inactive, so updates there are effectively manual already
-# (`bootc upgrade` here). Base-image defaults (flatpak-add-fedora-repos.service
+# No custom services to enable (Docker CE isn't installed at all here, so
+# there's no docker/containerd unit to leave disabled, unlike the source
+# laptop). bootc-fetch-apply-updates.timer stays disabled too — the source
+# laptop's rpm-ostree AutomaticUpdatePolicy is "stage" but its timer is
+# inactive, so updates there are effectively manual already (`bootc
+# upgrade` here). Base-image defaults (flatpak-add-fedora-repos.service
 # etc.) are untouched.
 
 # --- 9. Validate -------------------------------------------------------------
