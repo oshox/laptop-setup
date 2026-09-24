@@ -91,10 +91,16 @@ openssl req -new -x509 -newkey rsa:2048 -nodes -days 36500 \
 1. In Windows, install any pending LG BIOS/firmware updates (LG Update).
 2. Write a Fedora 44 Everything netinstall ISO to a USB stick, and
    `install/ks.cfg` to a second USB stick labeled `OEMDRV` (Anaconda loads
-   it automatically). Plug in wired Ethernet (USB-C adapter).
+   it automatically).
 3. Boot the installer, confirm disk names first (`ks.cfg`'s header
-   explains how), then let it run. It stops to ask for a **temporary root
-   password** — there's no kickstart `user`/`rootpw` on purpose.
+   explains how). It stops at the Installation Summary screen with two
+   spokes flagged as needing attention, since the kickstart deliberately
+   leaves both unset: **Network & Host Name** — connect to Wi-Fi there
+   (no Ethernet adapter needed; see `ks.cfg`'s networking note for why
+   Wi-Fi can't be scripted into the kickstart itself) — and **Root
+   Account** — set a **temporary** password (there's no kickstart
+   `user`/`rootpw` on purpose). Configure both, then click "Begin
+   Installation".
 4. Follow `migrate/FIRST-BOOT.md`.
 5. Migrate home configs:
    ```
