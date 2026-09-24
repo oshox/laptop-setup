@@ -22,7 +22,7 @@ FROM quay.io/fedora-ostree-desktops/sway-atomic:44
 # layered via rpm-ostree. The Vivaldi repo *file* is copied verbatim from
 # the source laptop's /etc/yum.repos.d. (Docker CE's repo is deliberately
 # not added — podman/toolbox are the only container runtime on this
-# machine; see step 3 below.)
+# machine; see step 4 below.)
 RUN set -eux; \
     FEDORA_VER="$(rpm -E %fedora)"; \
     dnf -y install \
@@ -57,15 +57,35 @@ RUN dnf -y config-manager setopt \
 # libswresample-free, libswscale-free).
 RUN dnf -y swap ffmpeg-free ffmpeg --allowerasing && dnf clean all
 
-# --- 3. Packages -------------------------------------------------------------
+# --- 3. Power profile daemon: power-profiles-daemon, not tuned-ppd ---------
+# The base image (like the source laptop) defaults to tuned + tuned-ppd
+# (Fedora's default since F41 — tuned-ppd is a compatibility shim that
+# answers the power-profiles-daemon D-Bus API by translating it to tuned
+# profiles). For this specific chipset that default is a real, *measured*
+# regression, not a style preference: Phoronix benchmarked a Panther Lake
+# laptop (same Core Ultra Series 2 generation as this Lunar Lake chip) and
+# found Fedora 44 running slower than five other current distros; the fix
+# was exactly `dnf swap tuned-ppd power-profiles-daemon` — after that swap
+# Fedora matched the others. (https://www.phoronix.com/review/fedora-pantherlake-thermald-tuned)
+# thermald and intel_lpmd are left exactly as the base image ships them:
+# both already default-enabled, and intel_lpmd has shipped a Lunar-Lake-
+# specific config since its 0.0.9 release (Fedora 44 has 0.1.0).
+RUN set -eux; \
+    dnf -y remove tuned-ppd tuned; \
+    dnf -y install power-profiles-daemon; \
+    dnf clean all; \
+    systemctl enable power-profiles-daemon.service; \
+    systemctl mask tuned.service tuned-ppd.service
+
+# --- 4. Packages ---------------------------------------------------------------
 # Fedora + updates
 #
 # Note: kernel-devel/kernel-headers are NOT installed here. They're only
-# needed to build the xpadneo kernel module (step 5), never at runtime —
+# needed to build the xpadneo kernel module (step 7), never at runtime —
 # unlike the source laptop, this image never rebuilds kernel modules on the
 # client (a new kernel means a whole new bootc image, built centrally), so
 # there's no akmods.service here to keep them around for. Installing and
-# removing them within step 5's own RUN instruction, rather than leaving
+# removing them within step 7's own RUN instruction, rather than leaving
 # them installed here, is what actually keeps them out of the final image:
 # an OCI layer's diff is additive, so deleting a file in a *later* layer
 # than the one that added it doesn't shrink the image, it just hides the
@@ -108,10 +128,10 @@ RUN dnf -y install \
 RUN dnf -y install intel-media-driver && dnf clean all
 
 # Terra: yazi. (akmod-xpadneo is installed, built, and removed again
-# entirely within step 5 below — see the note in step 3 above.)
+# entirely within step 7 below — see the note in step 4 above.)
 RUN dnf -y install yazi && dnf clean all
 
-# Vivaldi (see step 4 for the /opt relocation this needs)
+# Vivaldi (see step 6 for the /opt relocation this needs)
 RUN dnf -y install vivaldi-stable && dnf clean all
 
 # Steam + Deluge as native packages, replacing every flatpak app the source
@@ -132,10 +152,29 @@ RUN dnf -y install deluge \
 # docker-ce-cli/containerd.io/docker-compose-plugin) — podman/toolbox are
 # the only container runtime here, unlike the source laptop which has both
 # installed. Separately, kernel-devel/kernel-headers/akmods/kmodtool/
-# rpm-build are installed *and removed* in step 5 below, purely as a means
+# rpm-build are installed *and removed* in step 7 below, purely as a means
 # to build the signed xpadneo module — see the note there.
 
-# --- 4. Vivaldi /opt relocation --------------------------------------------
+# --- 5. Nix package manager directory ---------------------------------------
+# Only the /nix -> var/nix symlink is set up here, as a permanent part of
+# the root tree (the same way this base image already has /opt -> var/opt,
+# /srv -> var/srv, etc.) — /var is where an ostree/bootc system keeps state
+# that's meant to persist and grow across upgrades untouched, which is
+# exactly what a Nix store is. Nix itself is *not* installed at build time:
+# unlike Vivaldi (step 6), where the payload is a static, versioned thing
+# we deliberately want reset from /usr on every upgrade, a Nix store is
+# supposed to accumulate whatever you've installed and survive upgrades
+# unchanged — so baking an initial store into the image's /var would only
+# ever take effect on the very first deployment anyway (see step 6's note
+# on why), and would be actively wrong here since it'd imply resetting it.
+# Installing Nix itself is therefore a first-boot, human-run step — see
+# README.md's toolchain reinstall list (Determinate Systems installer,
+# multi-user/daemon mode, the same one https://nixos.org itself now
+# recommends). This also sidesteps trying to run a systemd-managing
+# installer inside this build, which has no real PID 1 to talk to.
+RUN ln -sf var/nix /nix
+
+# --- 6. Vivaldi /opt relocation --------------------------------------------
 # /opt is a symlink to /var/opt in bootc images, and unlike /usr, a fresh
 # image's /var content is only applied on the *initial* deployment, not on
 # later `bootc upgrade`s. So the real Vivaldi payload is moved into
@@ -148,7 +187,7 @@ RUN set -eux; \
     mv /opt/vivaldi /usr/lib/opt/vivaldi; \
     rmdir /var/opt/vivaldi 2>/dev/null || true
 
-# --- 5. Xbox controller driver (akmod-xpadneo), signed for Secure Boot -----
+# --- 7. Xbox controller driver (akmod-xpadneo), signed for Secure Boot -----
 # Everything needed only to *build* the module — kernel-devel, kernel-
 # headers, and akmod-xpadneo itself (which pulls in akmods, kmodtool,
 # rpm-build, gcc's already-kept anyway) — is installed and removed again
@@ -157,7 +196,7 @@ RUN set -eux; \
 # and the small xpadneo userspace package (udev rules, modprobe.d config —
 # built as a sibling RPM by the same akmods run) persist. That's also the
 # right behavior architecturally, not just a size trick: this image never
-# rebuilds kernel modules client-side (see step 3's note), so there's no
+# rebuilds kernel modules client-side (see step 4's note), so there's no
 # ongoing use for the build toolchain after this step.
 #
 # The private half of the MOK keypair is only ever available inside this
@@ -188,14 +227,14 @@ RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     SIGNER2="$(modinfo -F signer "$MODULE" 2>/dev/null || true)"; \
     test "$SIGNER2" = "$SIGNER" || { echo "hid_xpadneo module changed or disappeared after build-dep cleanup" >&2; exit 1; }
 
-# --- 6. authselect -----------------------------------------------------------
+# --- 8. authselect -----------------------------------------------------------
 # Same feature set as the source laptop, plus with-systemd-homed (needed for
 # pam_systemd_home so login/SDDM/swaylock/sudo work with the homed-managed
 # encrypted home).
 RUN authselect select local with-silent-lastlog with-mdns4 with-fingerprint \
         with-systemd-homed --force
 
-# --- 7. System config files (see files/ for the full tree) -----------------
+# --- 9. System config files (see files/ for the full tree) -----------------
 COPY files/etc/sudoers.d/10-wheel-nopasswd /etc/sudoers.d/10-wheel-nopasswd
 COPY files/etc/security/limits.d/nofile.conf /etc/security/limits.d/nofile.conf
 COPY files/etc/sddm.conf.d/10-custom-theme.conf /etc/sddm.conf.d/10-custom-theme.conf
@@ -208,14 +247,15 @@ COPY files/usr/share/sddm/themes/custom-theme /usr/share/sddm/themes/custom-them
 
 RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 
-# --- 8. Services -------------------------------------------------------------
-# No custom services to enable (Docker CE isn't installed at all here, so
+# --- 10. Services ------------------------------------------------------------
+# power-profiles-daemon is already enabled (step 3); tuned/tuned-ppd
+# already masked there too. Docker CE isn't installed at all here, so
 # there's no docker/containerd unit to leave disabled, unlike the source
-# laptop). bootc-fetch-apply-updates.timer stays disabled too — the source
+# laptop. bootc-fetch-apply-updates.timer stays disabled too — the source
 # laptop's rpm-ostree AutomaticUpdatePolicy is "stage" but its timer is
 # inactive, so updates there are effectively manual already (`bootc
 # upgrade` here). Base-image defaults (flatpak-add-fedora-repos.service
 # etc.) are untouched.
 
-# --- 9. Validate -------------------------------------------------------------
+# --- 11. Validate ------------------------------------------------------------
 RUN bootc container lint

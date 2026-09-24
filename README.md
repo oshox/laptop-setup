@@ -28,6 +28,20 @@ was generated from; the short version:
   itself is unchanged: `sway-atomic` is already Fedora's lightweight
   Sway-based bootc desktop, and there's no smaller variant that's still a
   real Sway desktop.
+- **power-profiles-daemon instead of tuned/tuned-ppd.** Fedora's own
+  default since F41 is measurably worse on this chip's generation —
+  Phoronix benchmarked a Panther Lake laptop (same Core Ultra Series 2
+  family as this Lunar Lake chip) running slower than five other distros
+  on Fedora 44, and `dnf swap tuned-ppd power-profiles-daemon` was the
+  fix. thermald and intel_lpmd are untouched (already enabled by the base
+  image, and intel_lpmd has shipped Lunar-Lake-specific config since
+  v0.0.9 — Fedora 44 has 0.1.0).
+- **Nix added** (Determinate Systems installer, multi-user/daemon mode).
+  Only the `/nix -> var/nix` symlink is baked into the image; Nix itself
+  installs at first login (see "Migrating your home directory" below) —
+  a Nix store is meant to grow and persist across upgrades untouched, so
+  installing it live is the architecturally correct choice here, not just
+  the easy one.
 
 ## Layout
 
@@ -96,11 +110,29 @@ openssl req -new -x509 -newkey rsa:2048 -nodes -days 36500 \
    curl -fsSL https://get.pnpm.io/install.sh | sh -
    pnpm add -g $(cat migrate/pnpm-globals.txt)
    pip install --user -r migrate/pip-user.txt
-   # Claude Code: native installer, https://claude.com/claude-code
+   curl -fsSL https://claude.ai/install.sh | bash          # Claude Code CLI
+   curl -fsSL https://install.determinate.systems/nix | sh -s -- install   # Nix, multi-user/daemon mode
    ```
+   Nix's installer starts `nix-daemon` via systemd itself — no reboot
+   needed — but `nix` won't be on `$PATH` until a new shell (or
+   `. /etc/profile.d/nix.sh`). Since `/nix` here is a symlink to
+   `/var/nix` rather than a plain directory, if `nix-daemon.service` isn't
+   running after a *later* reboot, `sudo systemctl daemon-reload && sudo
+   systemctl start nix-daemon` is the known fix (a symlinked/bind-mounted
+   `/nix` is a documented rough edge for the daemon's boot-time start).
 7. Copy over anything from "credentials, not copied by the rsync above"
    (see the plan's §D4) by hand: `~/.ssh ~/.aws ~/.kube`, VPN configs, the
    GitHub PAT, etc. — deliberately not synced automatically.
+
+**Claude Desktop:** not installed. Anthropic's official Linux beta
+(claude.com/download) currently supports only Ubuntu/Debian via apt or a
+`.deb` — Fedora and RHEL are explicitly not supported yet. There's a
+well-known community repackaging
+([aaddrick/claude-desktop-debian](https://github.com/aaddrick/claude-desktop-debian))
+that unpacks the official `.deb` and rebuilds it for other distros, but
+that's a third party repackaging a proprietary Electron app, not something
+to bake into this image without you explicitly asking for it. Claude Code
+(the CLI, above) covers the same account/functionality on Fedora today.
 
 ## Updating
 
