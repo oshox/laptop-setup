@@ -10,6 +10,10 @@ was generated from; the short version:
 - **Autologin disabled.**
 - **Not installed:** VS Code, Zed, and the mp3-tagging tools
   (puddletag, MusicBrainz Picard, beets).
+- **Steam and Deluge as native RPMs**, not flatpaks. Every other flatpak
+  app the source laptop had (Pithos, Obsidian, Fedora Media Writer,
+  Nicotine+) is dropped, not reinstalled in any form — so no flatpak apps
+  are preinstalled at all.
 
 ## Layout
 

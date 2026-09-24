@@ -53,14 +53,7 @@ show a login screen with no users yet.
    `modinfo hid_xpadneo | grep signer` should be non-empty once a
    controller is paired and the module loads.
 
-6. System-wide flatpak overrides (same as the source laptop):
-
-   ```
-   sudo flatpak override --filesystem=xdg-config/gtk-3.0
-   sudo flatpak override io.github.Pithos --env=GTK_THEME=Adwaita-dark
-   ```
-
-7. Copy the two `/usr/local`-installed binaries from the source laptop
+6. Copy the two `/usr/local`-installed binaries from the source laptop
    (they aren't packaged, just copied):
 
    ```

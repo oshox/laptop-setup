@@ -2,9 +2,9 @@
 #   rsync -aHr --files-from=migrate/home-include.txt oshox@old-laptop.local:/var/home/oshox/ ~/
 #
 # This is "dotfiles/configs only" (see plan §D1) — no personal data, no
-# credentials (see home-exclude-notes.md), no Steam/flatpak app data, no
-# caches. Directories are copied recursively; see adjust-dotfiles.sh for the
-# few files edited after copying.
+# credentials (see the plan's §D4/§D5 for the full exclude list), no Steam
+# library data, no caches. Directories are copied recursively; see
+# adjust-dotfiles.sh for the few files edited after copying.
 
 # --- shell / git ---
 .bashrc
@@ -69,11 +69,13 @@
 .config/configstore/
 
 # --- ~/.local ---
+# (no .local/share/flatpak/overrides/ — those on the source laptop are
+# Pithos-specific, and Pithos is one of the flatpak apps dropped, not
+# reinstalled)
 .local/share/applications/
 .local/share/icons/
 .local/share/desktop-directories/
 .local/share/bash-completion/
-.local/share/flatpak/overrides/
 
 # --- standalone programs (copied as-is, same versions) ---
 .local/bin/agy

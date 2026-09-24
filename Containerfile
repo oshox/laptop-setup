@@ -88,9 +88,21 @@ RUN dnf -y install vivaldi-stable && dnf clean all
 RUN dnf -y install docker-ce docker-ce-cli containerd.io docker-compose-plugin \
     && dnf clean all
 
-# Explicitly NOT installed here, per request: `code` (VS Code), `zed`, and
-# the mp3 taggers (beets is pip-user only on the source laptop and is
-# likewise not reinstalled — see migrate/pip-user.txt).
+# Steam + Deluge as native packages, replacing every flatpak app the source
+# laptop had (Steam, Pithos, Obsidian, Deluge, Fedora Media Writer,
+# Nicotine+): Steam and Deluge are kept, native; the rest are dropped
+# outright, not reinstalled in any form. Deluge is in Fedora's own repos.
+# Steam needs RPM Fusion's nonfree-steam repo, which ships disabled by
+# default (curated separately from the rest of nonfree) — enabled only for
+# this one transaction, not left on at runtime.
+RUN dnf -y install deluge \
+    && dnf -y --enablerepo=rpmfusion-nonfree-steam install steam \
+    && dnf clean all
+
+# Explicitly NOT installed here, per request: `code` (VS Code), `zed`, the
+# mp3 taggers (beets is pip-user only on the source laptop and is likewise
+# not reinstalled — see migrate/pip-user.txt), and every flatpak app other
+# than the two above.
 
 # --- 4. Vivaldi /opt relocation --------------------------------------------
 # /opt is a symlink to /var/opt in bootc images, and unlike /usr, a fresh
@@ -142,20 +154,18 @@ COPY files/etc/firewalld/zones/public.xml /etc/firewalld/zones/public.xml
 COPY files/etc/firewalld/zones/trusted.xml /etc/firewalld/zones/trusted.xml
 COPY files/usr/lib/systemd/logind.conf.d/10-lid.conf /usr/lib/systemd/logind.conf.d/10-lid.conf
 COPY files/usr/lib/systemd/system/user@.service.d/delegate.conf /usr/lib/systemd/system/user@.service.d/delegate.conf
-COPY files/usr/lib/systemd/system/flatpak-add-flathub.service /usr/lib/systemd/system/flatpak-add-flathub.service
-COPY files/usr/lib/systemd/system/flatpak-preinstall.service /usr/lib/systemd/system/flatpak-preinstall.service
 COPY files/usr/lib/tmpfiles.d/vivaldi.conf /usr/lib/tmpfiles.d/vivaldi.conf
-COPY files/usr/share/flatpak/preinstall.d/laptop.preinstall /usr/share/flatpak/preinstall.d/laptop.preinstall
 COPY files/usr/share/sddm/themes/custom-theme /usr/share/sddm/themes/custom-theme
 
 RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 
 # --- 8. Services -------------------------------------------------------------
-# docker/containerd stay disabled, same as the source laptop.
-# bootc-fetch-apply-updates.timer stays disabled too: the source laptop's
-# rpm-ostree AutomaticUpdatePolicy is "stage" but its timer is inactive, so
-# updates there are effectively manual already (`bootc upgrade` here).
-RUN systemctl enable flatpak-add-flathub.service flatpak-preinstall.service
+# No custom services to enable: docker/containerd stay disabled, same as
+# the source laptop, and bootc-fetch-apply-updates.timer stays disabled too
+# — the source laptop's rpm-ostree AutomaticUpdatePolicy is "stage" but its
+# timer is inactive, so updates there are effectively manual already
+# (`bootc upgrade` here). Base-image defaults (flatpak-add-fedora-repos.service
+# etc.) are untouched.
 
 # --- 9. Validate -------------------------------------------------------------
 RUN bootc container lint
