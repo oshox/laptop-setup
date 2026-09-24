@@ -38,8 +38,12 @@ COPY files/etc/yum.repos.d/vivaldi.repo /etc/yum.repos.d/vivaldi.repo
 # Same repo priorities as the source laptop (there, set at runtime via
 # `dnf config-manager --save --setopt=...`, which is why they show up as
 # `priority=` lines inside the .repo files rather than in the repo
-# definitions themselves).
+# definitions themselves). Also: skip installing docs/man pages for every
+# layered package from here on (tsflags=nodocs) — a standard, low-risk
+# image-size win (it doesn't touch %license files, only %doc/man/texinfo),
+# persisted into /etc/dnf/dnf.conf for the rest of this build.
 RUN dnf -y config-manager setopt \
+        tsflags=nodocs \
         fedora.priority=1 \
         updates.priority=1 \
         rpmfusion-free.priority=5 \
@@ -51,35 +55,61 @@ RUN dnf -y config-manager setopt \
 # Same swap rpm-ostree performs on the source laptop; removes the same 8
 # -free packages (ffmpeg-free, libav{codec,device,filter,format,util}-free,
 # libswresample-free, libswscale-free).
-RUN dnf -y swap ffmpeg-free ffmpeg --allowerasing
+RUN dnf -y swap ffmpeg-free ffmpeg --allowerasing && dnf clean all
 
 # --- 3. Packages -------------------------------------------------------------
 # Fedora + updates
 #
-# kernel-devel/kernel-headers are pinned to the *already-installed*
-# kernel-core version (i.e. the kernel actually baked into this base
-# image), not left to float to whatever's newest in the repos — otherwise
-# an unpinned `dnf install kernel-devel` could resolve to a newer kernel
-# than the one this image boots, and the xpadneo module built in step 5
-# would silently target the wrong /usr/lib/modules/<version> tree.
-RUN set -eux; \
-    KVER="$(rpm -q kernel-core --qf '%{version}-%{release}.%{arch}\n')"; \
-    dnf -y install \
+# Note: kernel-devel/kernel-headers are NOT installed here. They're only
+# needed to build the xpadneo kernel module (step 5), never at runtime —
+# unlike the source laptop, this image never rebuilds kernel modules on the
+# client (a new kernel means a whole new bootc image, built centrally), so
+# there's no akmods.service here to keep them around for. Installing and
+# removing them within step 5's own RUN instruction, rather than leaving
+# them installed here, is what actually keeps them out of the final image:
+# an OCI layer's diff is additive, so deleting a file in a *later* layer
+# than the one that added it doesn't shrink the image, it just hides the
+# bytes. kernel-devel alone is ~240MB on this laptop, kernel-headers ~7MB.
+RUN dnf -y install \
         alacritty alsa-lib-devel bat btop cargo clang cmake darktable \
         fontconfig-devel gcc gcc-c++ gimp git glib2-devel \
         gtk-layer-shell-devel gtk3-devel gvfs-mtp \
-        "kernel-devel-${KVER}" "kernel-headers-${KVER}" \
         libva-devel libxcb-devel libxkbcommon-x11-devel make micro mpv \
         musl-gcc openssl-devel perf perl-File-Compare perl-File-Copy \
         perl-FindBin perl-IPC-Cmd pianobar pip qalculate sqlite-devel strace \
-        valgrind wayland-devel; \
-    dnf clean all
+        valgrind wayland-devel \
+    && dnf clean all
+
+# Rust/Go/Zig build toolchains, plus dnf-native replacements for the
+# Homebrew-only formulae that Fedora now packages itself (see
+# migrate/Brewfile for what's left on brew and why). All of these are
+# plain Fedora/updates packages — no RPM Fusion or Terra needed:
+#   - Rust: `cargo` above already pulls in rustc; rustfmt/clippy/
+#     rust-analyzer round out the toolchain (new — the source laptop only
+#     has bare cargo+rustc).
+#   - Go: `golang` (new — Go isn't installed on the source laptop at all).
+#   - Zig: `zig` — replaces the source laptop's manually-installed
+#     ~/.local/opt/zig-0.16.0/ binary (dnf's zig is the same 0.16.0).
+#     migrate/home-include.txt no longer copies that manual install, so
+#     there's no ~/.local/bin/zig shadowing this one on PATH.
+#   - helm, k9s, rclone, yq, awscli2 (aws), golang-oras (oras): dnf
+#     versions of Brewfile formulae Fedora now ships. `yq` here really is
+#     mikefarah/yq (verified — same tool the Brewfile installed, not the
+#     unrelated python-yq/jq wrapper some distros ship under that name).
+#     golang-oras replaces the source laptop's manually-installed
+#     ~/.local/bin/oras the same way zig above does — also dropped from
+#     migrate/home-include.txt so it can't shadow this one.
+RUN dnf -y install \
+        awscli2 clippy golang golang-oras helm k9s rclone rust-analyzer \
+        rustfmt yq zig \
+    && dnf clean all
 
 # RPM Fusion: VA-API driver for Intel Arc (Lunar Lake iHD)
 RUN dnf -y install intel-media-driver && dnf clean all
 
-# Terra: yazi + the xpadneo akmod source (built and signed in step 5 below)
-RUN dnf -y install yazi akmod-xpadneo && dnf clean all
+# Terra: yazi. (akmod-xpadneo is installed, built, and removed again
+# entirely within step 5 below — see the note in step 3 above.)
+RUN dnf -y install yazi && dnf clean all
 
 # Vivaldi (see step 4 for the /opt relocation this needs)
 RUN dnf -y install vivaldi-stable && dnf clean all
@@ -95,12 +125,15 @@ RUN dnf -y install deluge \
     && dnf -y --enablerepo=rpmfusion-nonfree-steam install steam \
     && dnf clean all
 
-# Explicitly NOT installed here, per request: `code` (VS Code), `zed`, the
-# mp3 taggers (beets is pip-user only on the source laptop and is likewise
-# not reinstalled — see migrate/pip-user.txt), every flatpak app other than
-# the two above, and Docker CE (docker-ce/docker-ce-cli/containerd.io/
-# docker-compose-plugin) — podman/toolbox are the only container runtime
-# here, unlike the source laptop which has both installed.
+# Explicitly NOT installed in the final image, per request: `code` (VS
+# Code), `zed`, the mp3 taggers (beets is pip-user only on the source
+# laptop and is likewise not reinstalled — see migrate/pip-user.txt),
+# every flatpak app other than the two above, and Docker CE (docker-ce/
+# docker-ce-cli/containerd.io/docker-compose-plugin) — podman/toolbox are
+# the only container runtime here, unlike the source laptop which has both
+# installed. Separately, kernel-devel/kernel-headers/akmods/kmodtool/
+# rpm-build are installed *and removed* in step 5 below, purely as a means
+# to build the signed xpadneo module — see the note there.
 
 # --- 4. Vivaldi /opt relocation --------------------------------------------
 # /opt is a symlink to /var/opt in bootc images, and unlike /usr, a fresh
@@ -116,6 +149,17 @@ RUN set -eux; \
     rmdir /var/opt/vivaldi 2>/dev/null || true
 
 # --- 5. Xbox controller driver (akmod-xpadneo), signed for Secure Boot -----
+# Everything needed only to *build* the module — kernel-devel, kernel-
+# headers, and akmod-xpadneo itself (which pulls in akmods, kmodtool,
+# rpm-build, gcc's already-kept anyway) — is installed and removed again
+# within this one RUN instruction, so none of it ends up in the image:
+# only the already-compiled, already-signed kmod-xpadneo-<kver> package
+# and the small xpadneo userspace package (udev rules, modprobe.d config —
+# built as a sibling RPM by the same akmods run) persist. That's also the
+# right behavior architecturally, not just a size trick: this image never
+# rebuilds kernel modules client-side (see step 3's note), so there's no
+# ongoing use for the build toolchain after this step.
+#
 # The private half of the MOK keypair is only ever available inside this
 # RUN instruction, via a build secret, and is deleted before the
 # instruction ends -- it is never written to an image layer. The public
@@ -124,18 +168,25 @@ RUN set -eux; \
 COPY secureboot/MOK.der /usr/share/laptop-setup/MOK.der
 RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     set -eux; \
+    KVER="$(rpm -q kernel-core --qf '%{version}-%{release}.%{arch}\n')"; \
+    dnf -y install "kernel-devel-${KVER}" "kernel-headers-${KVER}" akmod-xpadneo; \
     install -D -m0444 /usr/share/laptop-setup/MOK.der /etc/pki/akmods/certs/public_key.der; \
     install -D -m0400 -o root -g akmods /run/secrets/mok_privkey /etc/pki/akmods/private/private_key.priv; \
     chown root:akmods /etc/pki/akmods/certs/public_key.der; \
     chmod 0750 /etc/pki/akmods/certs /etc/pki/akmods/private; \
-    KVER="$(rpm -q kernel-core --qf '%{version}-%{release}.%{arch}\n')"; \
     akmods --force --kernels "$KVER" --akmod xpadneo; \
     MODULE="$(find "/usr/lib/modules/${KVER}" -iname 'hid_xpadneo.ko*' -print -quit)"; \
     test -n "$MODULE" || { echo "hid_xpadneo module was not built" >&2; exit 1; }; \
     SIGNER="$(modinfo -F signer "$MODULE" 2>/dev/null || true)"; \
     echo "hid_xpadneo module signer: ${SIGNER:-<NONE>}"; \
     test -n "$SIGNER" || { echo "hid_xpadneo module is UNSIGNED" >&2; exit 1; }; \
-    rm -f /etc/pki/akmods/private/private_key.priv
+    rm -f /etc/pki/akmods/private/private_key.priv; \
+    dnf -y remove "kernel-devel-${KVER}" "kernel-headers-${KVER}" akmod-xpadneo akmods kmodtool rpm-build rpm-build-libs; \
+    dnf clean all; \
+    rm -rf /usr/src/akmods/*; \
+    rpm -q xpadneo >/dev/null || { echo "xpadneo (udev/modprobe support package) did not survive build-dep cleanup" >&2; exit 1; }; \
+    SIGNER2="$(modinfo -F signer "$MODULE" 2>/dev/null || true)"; \
+    test "$SIGNER2" = "$SIGNER" || { echo "hid_xpadneo module changed or disappeared after build-dep cleanup" >&2; exit 1; }
 
 # --- 6. authselect -----------------------------------------------------------
 # Same feature set as the source laptop, plus with-systemd-homed (needed for

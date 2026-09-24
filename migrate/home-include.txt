@@ -78,9 +78,12 @@
 .local/share/bash-completion/
 
 # --- standalone programs (copied as-is, same versions) ---
+# (no .local/bin/oras or .local/bin/zig + .local/opt/zig-0.16.0/ — both are
+# now dnf packages (golang-oras, zig; see the Containerfile), and
+# ~/.local/bin is earlier on PATH than /usr/bin, so copying the old manual
+# binaries would silently shadow the new system ones)
 .local/bin/agy
 .local/bin/mount-s3
-.local/bin/oras
 .local/bin/ruff
 .local/bin/tea
 .local/bin/transcode-av1.sh
@@ -89,8 +92,6 @@
 .local/bin/waybar-gmail
 .local/bin/waybar-gmail-popup
 .local/bin/wttrbar
-.local/bin/zig
 .local/bin/flint
-.local/opt/zig-0.16.0/
 .local/flint.app/
 .deno/

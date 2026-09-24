@@ -1,18 +1,17 @@
 # brew bundle --file=migrate/Brewfile
-# Matches `brew leaves` / `brew tap` on the source laptop exactly.
+#
+# What's left here has no Fedora/RPM Fusion/Terra package (verified against
+# real repo metadata, not guessed — see the Containerfile's "Rust/Go/Zig
+# build toolchains" comment for what moved to dnf and why: helm, k9s,
+# rclone, yq, awscli, oras). controlplaneio-fluxcd/tap and fluxcd/tap from
+# the source laptop's `brew tap` output are dropped here — no flux formula
+# was ever actually installed from them (checked: they're orphaned taps
+# with nothing in `brew leaves` pulling them in).
 
 tap "argoproj/tap"
-tap "controlplaneio-fluxcd/tap"
-tap "fluxcd/tap"
 
 brew "apko"
 brew "argocd"
-brew "awscli"
 brew "gemini-cli"
-brew "helm"
 brew "k3d"
-brew "k9s"
 brew "kubernetes-cli"
-brew "oras"
-brew "rclone"
-brew "yq"

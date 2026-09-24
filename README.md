@@ -17,6 +17,17 @@ was generated from; the short version:
 - **No Docker CE.** The source laptop has both docker-ce and podman
   installed (docker unused, left disabled); this image has podman/toolbox
   only.
+- **Rust, Go, and Zig build toolchains**, and dnf in place of Homebrew
+  wherever Fedora packages the same tool (verified against real Fedora 44
+  repo metadata — see the Containerfile's "Rust/Go/Zig build toolchains"
+  step and `migrate/Brewfile`).
+- **Image size optimized:** doc/man pages skipped for every layered
+  package, and the ~250MB of kernel-devel/headers (plus akmods/kmodtool/
+  rpm-build) needed only to build the xpadneo module never persist in the
+  image — installed and removed within the same layer. The base image
+  itself is unchanged: `sway-atomic` is already Fedora's lightweight
+  Sway-based bootc desktop, and there's no smaller variant that's still a
+  real Sway desktop.
 
 ## Layout
 
