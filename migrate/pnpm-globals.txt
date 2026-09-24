@@ -1,0 +1,10 @@
+# pnpm add -g $(cat migrate/pnpm-globals.txt)
+#
+# Matches `pnpm ls -g` on the source laptop, minus gemini-cli@latest (that
+# entry there is `link:google/gemini-cli@latest` — a local checkout linked
+# in, not a real registry install — and is already covered by the Homebrew
+# gemini-cli formula in Brewfile).
+@marko/language-server
+aws-cdk
+cdk8s-cli
+dax

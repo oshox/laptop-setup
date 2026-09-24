@@ -1,0 +1,18 @@
+# brew bundle --file=migrate/Brewfile
+# Matches `brew leaves` / `brew tap` on the source laptop exactly.
+
+tap "argoproj/tap"
+tap "controlplaneio-fluxcd/tap"
+tap "fluxcd/tap"
+
+brew "apko"
+brew "argocd"
+brew "awscli"
+brew "gemini-cli"
+brew "helm"
+brew "k3d"
+brew "k9s"
+brew "kubernetes-cli"
+brew "oras"
+brew "rclone"
+brew "yq"

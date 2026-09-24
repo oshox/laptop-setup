@@ -1,0 +1,69 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: [migrate/**, install/**, README.md]
+  schedule:
+    # nightly, to pick up Fedora/RPM Fusion/Terra updates
+    - cron: '17 8 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/laptop-setup
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # bootc images are large (~5-8GB build context/layers); the default
+      # ubuntu-latest runner disk is too small without this.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          docker-images: false
+
+      - name: Set image tag
+        id: tag
+        run: echo "date=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Write MOK private key
+        run: |
+          umask 077
+          printf '%s' "${{ secrets.MOK_PRIVATE_KEY }}" > "$RUNNER_TEMP/mok_privkey.pem"
+
+      - name: Build image
+        run: |
+          podman build \
+            --secret id=mok_privkey,src="$RUNNER_TEMP/mok_privkey.pem" \
+            -t "$IMAGE:latest" \
+            -t "$IMAGE:44-${{ steps.tag.outputs.date }}" \
+            -f Containerfile .
+
+      - name: Remove MOK private key
+        if: always()
+        run: shred -u "$RUNNER_TEMP/mok_privkey.pem" 2>/dev/null || rm -f "$RUNNER_TEMP/mok_privkey.pem"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push image
+        run: |
+          podman push "$IMAGE:latest"
+          podman push "$IMAGE:44-${{ steps.tag.outputs.date }}"
+
+# One-time setup after the first successful run (not automated):
+#   1. github.com/oshox?tab=packages -> laptop-setup -> Package settings
+#      -> Change visibility -> Public. The repo stays private; the image
+#      itself holds no secrets, and the laptop needs no registry login to
+#      `bootc upgrade`.
+#   2. Repo secret MOK_PRIVATE_KEY must hold the PEM/DER contents of
+#      secureboot/MOK.priv (generated once, see Containerfile header;
+#      never committed to this repo).

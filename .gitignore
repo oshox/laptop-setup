@@ -1,0 +1,10 @@
+# Never commit the private half of the MOK signing key. Only MOK.der
+# (the public cert) belongs in this repo; the private key lives in the
+# MOK_PRIVATE_KEY GitHub Actions secret and, offline, in a password manager.
+secureboot/MOK.priv
+secureboot/*.priv
+secureboot/*.pem
+secureboot/*.key
+
+*.swp
+.DS_Store

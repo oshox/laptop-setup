@@ -1,0 +1,18 @@
+[Unit]
+Description=Add the Flathub flatpak repository
+ConditionPathExists=!/var/lib/flatpak/.flathub-initialized
+After=network-online.target
+Wants=network-online.target
+Before=flatpak-preinstall.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Fetches flathub.flatpakrepo (including its real signing key) straight from
+# Flathub, the same way the base image's flatpak-add-fedora-repos.service
+# adds the "fedora" remote. Nothing here hardcodes a GPG key.
+ExecStart=/usr/bin/flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+ExecStartPost=/usr/bin/touch /var/lib/flatpak/.flathub-initialized
+
+[Install]
+WantedBy=multi-user.target

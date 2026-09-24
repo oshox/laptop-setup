@@ -1,0 +1,13 @@
+# pip install --user -r migrate/pip-user.txt
+#
+# Only the packages actually installed on purpose on the source laptop
+# (Python 3.14, the current interpreter there); their dependencies will
+# pull themselves in. NOT reinstalled, on request: beets and everything
+# beets alone pulled in (confuse, jellyfish, lap, mediafile, filetype,
+# numba, llvmlite, pyrate-limiter, requests-ratelimiter, Unidecode). Also
+# not reinstalled: the Python-3.13-era dev tools whose ~/.local/bin shims
+# were already broken on the source laptop (mypy, pyright, basedpyright,
+# pipenv, virtualenv, nodeenv, aws-cdk-lib and friends) — reinstall
+# individually if you still use them.
+matplotlib
+scipy

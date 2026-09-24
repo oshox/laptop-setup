@@ -1,0 +1,94 @@
+# Paths (relative to $HOME) copied from the source laptop with:
+#   rsync -aHr --files-from=migrate/home-include.txt oshox@old-laptop.local:/var/home/oshox/ ~/
+#
+# This is "dotfiles/configs only" (see plan §D1) — no personal data, no
+# credentials (see home-exclude-notes.md), no Steam/flatpak app data, no
+# caches. Directories are copied recursively; see adjust-dotfiles.sh for the
+# few files edited after copying.
+
+# --- shell / git ---
+.bashrc
+.bash_profile
+.profile
+.bash_logout
+.bashrc.d/aliases.bashrc
+.bashrc.d/docker-compat.bashrc
+.bashrc.d/editor.bashrc
+.bashrc.d/git-prompt.bashrc
+.bashrc.d/linuxbrew.bashrc
+.gitconfig
+.gtkrc-2.0
+.ruff.toml
+
+# --- desktop look & layout ---
+.config/sway/
+.config/waybar/config.jsonc
+.config/waybar/style.css
+.config/rofi/
+.config/dunst/
+.config/swaylock/
+.config/alacritty/
+.config/ghostty/
+.config/gtk-3.0/
+.config/gtk-4.0/
+.config/lxqt/
+.config/dconf/
+.config/mimeapps.list
+.config/user-dirs.dirs
+.config/user-dirs.locale
+.config/menus/
+.config/background.jpg
+.config/lockscreen.jpg
+.config/lockscreen2.jpg
+.config/Thunar/
+.config/xfce4/
+.config/pavucontrol.ini
+.config/pipewire/
+.config/systemd/
+
+# --- app / tool configs ---
+.config/micro/bindings.json
+.config/micro/settings.json
+.config/micro/plug/
+.config/btop/
+.config/qalculate/
+.config/mpv/
+.config/xarchiver/
+.config/superfile/
+.config/GIMP/
+.config/darktable/darktablerc
+.config/darktable/darktablerc-common
+.config/darktable/data.db
+.config/helm/
+.config/k9s/
+.config/k3d/
+.config/uv/
+.config/git/
+.config/gram/
+.config/flint/
+.config/configstore/
+
+# --- ~/.local ---
+.local/share/applications/
+.local/share/icons/
+.local/share/desktop-directories/
+.local/share/bash-completion/
+.local/share/flatpak/overrides/
+
+# --- standalone programs (copied as-is, same versions) ---
+.local/bin/agy
+.local/bin/mount-s3
+.local/bin/oras
+.local/bin/ruff
+.local/bin/tea
+.local/bin/transcode-av1.sh
+.local/bin/uv
+.local/bin/uvx
+.local/bin/waybar-gmail
+.local/bin/waybar-gmail-popup
+.local/bin/wttrbar
+.local/bin/zig
+.local/bin/flint
+.local/opt/zig-0.16.0/
+.local/flint.app/
+.deno/
