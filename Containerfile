@@ -256,7 +256,11 @@ RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     chmod 0750 /etc/pki/akmods/certs /etc/pki/akmods/private; \
     akmods --force --kernels "$KVER" --akmod xpadneo; \
     MODULE="$(find "/usr/lib/modules/${KVER}" -iname 'hid_xpadneo.ko*' -print -quit)"; \
-    test -n "$MODULE" || { echo "hid_xpadneo module was not built" >&2; exit 1; }; \
+    if [ -z "$MODULE" ]; then \
+        echo "hid_xpadneo module was not built; dumping akmods failure log(s):" >&2; \
+        cat /var/cache/akmods/xpadneo/*.failed.log >&2 2>/dev/null || echo "(no failed.log found)" >&2; \
+        exit 1; \
+    fi; \
     SIGNER="$(modinfo -F signer "$MODULE" 2>/dev/null || true)"; \
     echo "hid_xpadneo module signer: ${SIGNER:-<NONE>}"; \
     test -n "$SIGNER" || { echo "hid_xpadneo module is UNSIGNED" >&2; exit 1; }; \
