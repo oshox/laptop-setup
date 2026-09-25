@@ -53,13 +53,5 @@ show a login screen with no users yet.
    `modinfo hid_xpadneo | grep signer` should be non-empty once a
    controller is paired and the module loads.
 
-6. Copy the `/usr/local`-installed k0s binary from the source laptop
-   (it isn't packaged, just copied):
-
-   ```
-   scp old-laptop.local:/var/usrlocal/bin/k0s /usr/local/bin/
-   sudo restorecon -v /usr/local/bin/k0s
-   ```
-
 Next: run the home-directory migration (see `../README.md` "Migrating your
 home directory").
