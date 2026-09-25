@@ -140,7 +140,19 @@ RUN dnf -y install yazi && dnf clean all
 # Steam needs RPM Fusion's nonfree-steam repo, which ships disabled by
 # default (curated separately from the rest of nonfree) — enabled only for
 # this one transaction, not left on at runtime.
-RUN dnf -y install deluge \
+#
+# gamescope and protonplus ride along here, both native RPMs too:
+#   - gamescope: Fedora's own `updates` repo, no extra repo needed. Used as
+#     Steam's per-game "Force the use of a specific Steam Play compatibility
+#     tool" / launch-option compositor (SteamOS-style), not the standalone
+#     gamescope-session (that's a full Big-Picture-on-boot desktop session,
+#     Terra-only, not wanted here).
+#   - protonplus: Terra, a GTK4 app that downloads GE-Proton/Wine-GE
+#     releases. It only installs the *manager*; the actual GE-Proton build
+#     it fetches lands in ~/.local/share/Steam/compatibilitytools.d, which
+#     is per-user data on /var/home like the Nix store (see step 5) — not
+#     baked into the image. Run it once at first login to pick a version.
+RUN dnf -y install deluge gamescope protonplus \
     && dnf -y --enablerepo=rpmfusion-nonfree-steam install steam \
     && dnf clean all
 

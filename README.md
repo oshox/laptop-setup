@@ -14,6 +14,11 @@ was generated from; the short version:
   app the source laptop had (Pithos, Obsidian, Fedora Media Writer,
   Nicotine+) is dropped, not reinstalled in any form — so no flatpak apps
   are preinstalled at all.
+- **gamescope and protonplus**, also native RPMs (Fedora's own repo and
+  Terra respectively), for Steam Play. protonplus only installs the
+  GE-Proton *manager*; run it once at first login to actually fetch a
+  GE-Proton build into `~/.local/share/Steam/compatibilitytools.d` — that
+  download is per-user data on the second SSD, not baked into the image.
 - **No Docker CE.** The source laptop has both docker-ce and podman
   installed (docker unused, left disabled); this image has podman/toolbox
   only.
