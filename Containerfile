@@ -246,6 +246,13 @@ RUN set -eux; \
 # user out, failing signing with an OpenSSL "Permission denied" that has
 # nothing to do with the key's actual validity.
 #
+# The MODULE search below matches `*xpadneo*.ko*`, not `hid_xpadneo.ko*`:
+# the on-disk file is named with a dash (hid-xpadneo.ko*), even though
+# the loaded module's own name is underscored (hid_xpadneo) everywhere
+# else (modinfo, modprobe.d, this comment). -iname's case-insensitivity
+# doesn't bridge dash vs underscore, so the stricter pattern silently
+# matched nothing despite akmods reporting a clean build.
+#
 # The private half of the MOK keypair is only ever available inside this
 # RUN instruction, via a build secret, and is deleted before the
 # instruction ends -- it is never written to an image layer. The public
@@ -262,7 +269,7 @@ RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     chown root:akmods /etc/pki/akmods/certs/public_key.der; \
     chmod 0750 /etc/pki/akmods/certs /etc/pki/akmods/private; \
     akmods --force --kernels "$KVER" --akmod xpadneo; \
-    MODULE="$(find "/usr/lib/modules/${KVER}" -iname 'hid_xpadneo.ko*' -print -quit)"; \
+    MODULE="$(find "/usr/lib/modules/${KVER}" -iname '*xpadneo*.ko*' -print -quit)"; \
     if [ -z "$MODULE" ]; then \
         echo "hid_xpadneo module was not built; dumping akmods failure log(s):" >&2; \
         cat /var/cache/akmods/xpadneo/*.failed.log >&2 2>/dev/null || echo "(no failed.log found)" >&2; \
