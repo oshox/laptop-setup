@@ -1,4 +1,4 @@
-# pnpm add -g $(cat migrate/pnpm-globals.txt)
+# pnpm add -g $(grep -v '^#' migrate/pnpm-globals.txt)
 #
 # Matches `pnpm ls -g` on the source laptop, minus gemini-cli@latest (that
 # entry there is `link:google/gemini-cli@latest` — a local checkout linked

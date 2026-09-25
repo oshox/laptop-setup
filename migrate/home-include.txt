@@ -1,5 +1,5 @@
 # Paths (relative to $HOME) copied from the source laptop with:
-#   rsync -aHr --files-from=migrate/home-include.txt oshox@old-laptop.local:/var/home/oshox/ ~/
+#   rsync -aHr --files-from=<(grep -v '^#' migrate/home-include.txt) oshox@old-laptop.local:/var/home/oshox/ ~/
 #
 # This is "dotfiles/configs only" (see plan §D1) — no personal data, no
 # credentials (see the plan's §D4/§D5 for the full exclude list), no Steam

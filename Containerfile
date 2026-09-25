@@ -154,24 +154,23 @@ RUN dnf -y install deluge \
 # installed *and removed* in step 7 below, purely as a means to build the
 # signed xpadneo module — see the note there.
 
-# --- 5. Nix package manager directory ---------------------------------------
-# Only the /nix -> var/nix symlink is set up here, as a permanent part of
-# the root tree (the same way this base image already has /opt -> var/opt,
-# /srv -> var/srv, etc.) — /var is where an ostree/bootc system keeps state
-# that's meant to persist and grow across upgrades untouched, which is
-# exactly what a Nix store is. Nix itself is *not* installed at build time:
-# unlike Vivaldi (step 6), where the payload is a static, versioned thing
-# we deliberately want reset from /usr on every upgrade, a Nix store is
-# supposed to accumulate whatever you've installed and survive upgrades
-# unchanged — so baking an initial store into the image's /var would only
-# ever take effect on the very first deployment anyway (see step 6's note
-# on why), and would be actively wrong here since it'd imply resetting it.
-# Installing Nix itself is therefore a first-boot, human-run step — see
-# README.md's toolchain reinstall list (Determinate Systems installer,
-# multi-user/daemon mode, the same one https://nixos.org itself now
-# recommends). This also sidesteps trying to run a systemd-managing
-# installer inside this build, which has no real PID 1 to talk to.
-RUN ln -sf var/nix /nix
+# --- 5. Nix package manager mountpoint ------------------------------------
+# Only an empty /nix directory is baked into the image, as a mountpoint.
+# The store itself lives in /var/home/nix (persistent state that grows and
+# survives upgrades untouched — /var/home here is the second SSD) and is
+# bind-mounted onto /nix by the nix.mount unit the Determinate Systems
+# installer writes. Nix itself is *not* installed at build time: a store is
+# supposed to accumulate whatever you've installed, and a fresh image's
+# /var content only takes effect on the initial deployment anyway. It's a
+# first-boot, human-run step — see README.md's toolchain reinstall list.
+#
+# Why a real directory and not a /nix -> var/nix symlink (the original
+# approach here): Nix refuses a store path that goes through a symlink,
+# and the installer's ostree planner only creates /nix itself when it's
+# missing, via `chattr -i /; mkdir /nix` — which fails outright on this
+# composefs root ("chattr: Operation not supported"). With /nix already a
+# real directory that step is skipped and only the bind mount runs.
+RUN mkdir -p /nix
 
 # --- 6. Vivaldi, installed into a real /opt then relocated -----------------
 # /opt is a symlink to /var/opt in bootc images, and unlike /usr, a fresh

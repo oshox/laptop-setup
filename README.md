@@ -37,8 +37,9 @@ was generated from; the short version:
   image, and intel_lpmd has shipped Lunar-Lake-specific config since
   v0.0.9 — Fedora 44 has 0.1.0).
 - **Nix added** (Determinate Systems installer, multi-user/daemon mode).
-  Only the `/nix -> var/nix` symlink is baked into the image; Nix itself
-  installs at first login (see "Migrating your home directory" below) —
+  Only an empty `/nix` mountpoint is baked into the image (the store lives
+  in `/var/home/nix`, bind-mounted onto it); Nix itself installs at first
+  login (see "Migrating your home directory" below) —
   a Nix store is meant to grow and persist across upgrades untouched, so
   installing it live is the architecturally correct choice here, not just
   the easy one.
@@ -105,7 +106,7 @@ openssl req -new -x509 -newkey rsa:2048 -nodes -days 36500 \
 5. Migrate home configs:
    ```
    # on the old laptop: sudo systemctl start sshd   (stop it again after)
-   rsync -aHr --files-from=migrate/home-include.txt oshox@old-laptop.local:/var/home/oshox/ ~/
+   rsync -aHr --files-from=<(grep -v '^#' migrate/home-include.txt) oshox@old-laptop.local:/var/home/oshox/ ~/
    sudo restorecon -R ~
    ./migrate/adjust-dotfiles.sh
    ```
@@ -114,18 +115,16 @@ openssl req -new -x509 -newkey rsa:2048 -nodes -days 36500 \
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    brew bundle --file=migrate/Brewfile
    curl -fsSL https://get.pnpm.io/install.sh | sh -
-   pnpm add -g $(cat migrate/pnpm-globals.txt)
+   pnpm add -g $(grep -v '^#' migrate/pnpm-globals.txt)
    pip install --user -r migrate/pip-user.txt
    curl -fsSL https://claude.ai/install.sh | bash          # Claude Code CLI
    curl -fsSL https://install.determinate.systems/nix | sh -s -- install   # Nix, multi-user/daemon mode
    ```
    Nix's installer starts `nix-daemon` via systemd itself — no reboot
    needed — but `nix` won't be on `$PATH` until a new shell (or
-   `. /etc/profile.d/nix.sh`). Since `/nix` here is a symlink to
-   `/var/nix` rather than a plain directory, if `nix-daemon.service` isn't
-   running after a *later* reboot, `sudo systemctl daemon-reload && sudo
-   systemctl start nix-daemon` is the known fix (a symlinked/bind-mounted
-   `/nix` is a documented rough edge for the daemon's boot-time start).
+   `. /etc/profile.d/nix.sh`). It detects the ostree system and writes a
+   `nix.mount` unit bind-mounting `/var/home/nix` onto the image's empty
+   `/nix` directory.
 7. Copy over anything from "credentials, not copied by the rsync above"
    (see the plan's §D4) by hand: `~/.ssh ~/.aws ~/.kube`, VPN configs, the
    GitHub PAT, etc. — deliberately not synced automatically.
