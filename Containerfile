@@ -80,16 +80,16 @@ RUN set -eux; \
 # --- 4. Packages ---------------------------------------------------------------
 # Fedora + updates
 #
-# Note: kernel-devel/kernel-headers are NOT installed here. They're only
-# needed to build the xpadneo kernel module (step 7), never at runtime —
-# unlike the source laptop, this image never rebuilds kernel modules on the
-# client (a new kernel means a whole new bootc image, built centrally), so
-# there's no akmods.service here to keep them around for. Installing and
-# removing them within step 7's own RUN instruction, rather than leaving
-# them installed here, is what actually keeps them out of the final image:
-# an OCI layer's diff is additive, so deleting a file in a *later* layer
-# than the one that added it doesn't shrink the image, it just hides the
-# bytes. kernel-devel alone is ~240MB on this laptop, kernel-headers ~7MB.
+# Note: kernel-devel is NOT installed here. It's only needed to build the
+# xpadneo kernel module (step 7), never at runtime — unlike the source
+# laptop, this image never rebuilds kernel modules on the client (a new
+# kernel means a whole new bootc image, built centrally), so there's no
+# akmods.service here to keep it around for. Installing and removing it
+# within step 7's own RUN instruction, rather than leaving it installed
+# here, is what actually keeps it out of the final image: an OCI layer's
+# diff is additive, so deleting a file in a *later* layer than the one
+# that added it doesn't shrink the image, it just hides the bytes.
+# kernel-devel is ~240MB on this laptop.
 RUN dnf -y install \
         alacritty alsa-lib-devel bat btop cargo clang cmake darktable \
         fontconfig-devel gcc gcc-c++ gimp git glib2-devel \
@@ -150,9 +150,9 @@ RUN dnf -y install deluge \
 # every flatpak app other than the two above, and Docker CE (docker-ce/
 # docker-ce-cli/containerd.io/docker-compose-plugin) — podman/toolbox are
 # the only container runtime here, unlike the source laptop which has both
-# installed. Separately, kernel-devel/kernel-headers/akmods/kmodtool/
-# rpm-build are installed *and removed* in step 7 below, purely as a means
-# to build the signed xpadneo module — see the note there.
+# installed. Separately, kernel-devel/akmods/kmodtool/rpm-build are
+# installed *and removed* in step 7 below, purely as a means to build the
+# signed xpadneo module — see the note there.
 
 # --- 5. Nix package manager directory ---------------------------------------
 # Only the /nix -> var/nix symlink is set up here, as a permanent part of
@@ -202,10 +202,19 @@ RUN set -eux; \
     ln -sf var/opt /opt
 
 # --- 7. Xbox controller driver (akmod-xpadneo), signed for Secure Boot -----
-# Everything needed only to *build* the module — kernel-devel, kernel-
-# headers, and akmod-xpadneo itself (which pulls in akmods, kmodtool,
-# rpm-build, gcc's already-kept anyway) — is installed and removed again
-# within this one RUN instruction, so none of it ends up in the image:
+# Everything needed only to *build* the module — kernel-devel and
+# akmod-xpadneo itself (which pulls in akmods, kmodtool, rpm-build, gcc's
+# already-kept anyway) — is installed and removed again within this one
+# RUN instruction, so none of it ends up in the image. Only kernel-devel
+# is needed here, not kernel-headers: the out-of-tree module build uses
+# /usr/src/kernels/<version> from kernel-devel directly (that's what
+# akmods'/akmod-xpadneo's own package dependencies actually require —
+# neither lists kernel-headers), and kernel-headers is about userspace
+# UAPI headers, unrelated to building a kernel module. Worth avoiding
+# regardless: kernel-headers doesn't reliably ship in lockstep with
+# kernel-core/kernel-devel (confirmed on the source laptop, where they
+# were a full version apart), so pinning it to the same derived version
+# as kernel-devel can simply fail to resolve.
 # only the already-compiled, already-signed kmod-xpadneo-<kver> package
 # and the small xpadneo userspace package (udev rules, modprobe.d config —
 # built as a sibling RPM by the same akmods run) persist. That's also the
@@ -222,7 +231,7 @@ COPY secureboot/MOK.der /usr/share/laptop-setup/MOK.der
 RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     set -eux; \
     KVER="$(rpm -q kernel-core --qf '%{version}-%{release}.%{arch}\n')"; \
-    dnf -y install "kernel-devel-${KVER}" "kernel-headers-${KVER}" akmod-xpadneo; \
+    dnf -y install "kernel-devel-${KVER}" akmod-xpadneo; \
     install -D -m0444 /usr/share/laptop-setup/MOK.der /etc/pki/akmods/certs/public_key.der; \
     install -D -m0400 -o root -g akmods /run/secrets/mok_privkey /etc/pki/akmods/private/private_key.priv; \
     chown root:akmods /etc/pki/akmods/certs/public_key.der; \
@@ -234,7 +243,7 @@ RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     echo "hid_xpadneo module signer: ${SIGNER:-<NONE>}"; \
     test -n "$SIGNER" || { echo "hid_xpadneo module is UNSIGNED" >&2; exit 1; }; \
     rm -f /etc/pki/akmods/private/private_key.priv; \
-    dnf -y remove "kernel-devel-${KVER}" "kernel-headers-${KVER}" akmod-xpadneo akmods kmodtool rpm-build rpm-build-libs; \
+    dnf -y remove "kernel-devel-${KVER}" akmod-xpadneo akmods kmodtool rpm-build rpm-build-libs; \
     dnf clean all; \
     rm -rf /usr/src/akmods/*; \
     rpm -q xpadneo >/dev/null || { echo "xpadneo (udev/modprobe support package) did not survive build-dep cleanup" >&2; exit 1; }; \
