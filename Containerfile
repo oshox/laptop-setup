@@ -131,8 +131,7 @@ RUN dnf -y install intel-media-driver && dnf clean all
 # entirely within step 7 below — see the note in step 4 above.)
 RUN dnf -y install yazi && dnf clean all
 
-# Vivaldi (see step 6 for the /opt relocation this needs)
-RUN dnf -y install vivaldi-stable && dnf clean all
+# Vivaldi is installed in step 6 below, not here — see that step's note.
 
 # Steam + Deluge as native packages, replacing every flatpak app the source
 # laptop had (Steam, Pithos, Obsidian, Deluge, Fedora Media Writer,
@@ -174,18 +173,33 @@ RUN dnf -y install deluge \
 # installer inside this build, which has no real PID 1 to talk to.
 RUN ln -sf var/nix /nix
 
-# --- 6. Vivaldi /opt relocation --------------------------------------------
+# --- 6. Vivaldi, installed into a real /opt then relocated -----------------
 # /opt is a symlink to /var/opt in bootc images, and unlike /usr, a fresh
 # image's /var content is only applied on the *initial* deployment, not on
-# later `bootc upgrade`s. So the real Vivaldi payload is moved into
+# later `bootc upgrade`s. So the real Vivaldi payload needs to end up in
 # /usr/lib/opt/vivaldi (part of /usr, which *does* get updated every
-# upgrade) and files/usr/lib/tmpfiles.d/vivaldi.conf recreates
+# upgrade), with files/usr/lib/tmpfiles.d/vivaldi.conf recreating
 # /var/opt/vivaldi -> /usr/lib/opt/vivaldi on every boot. This is what
 # rpm-ostree does automatically for /opt content on the source laptop.
+#
+# The RPM is deliberately *not* installed straight through the existing
+# /opt -> var/opt symlink (that was the original approach here, and it's
+# what a live rpm-ostree/dnf system would do without a second thought) —
+# on GitHub's runners specifically, cpio extracting through that symlink
+# during the RPM transaction fails outright ("mkdir failed - No data
+# available"), most likely an SELinux-xattr quirk of buildah's storage
+# driver on a non-SELinux build host. Swapping in a plain, real /opt
+# directory for the duration of the install sidesteps the symlink
+# traversal entirely, regardless of the exact cause.
 RUN set -eux; \
+    rm -f /opt; \
+    mkdir -p /opt; \
+    dnf -y install vivaldi-stable; \
+    dnf clean all; \
     mkdir -p /usr/lib/opt; \
     mv /opt/vivaldi /usr/lib/opt/vivaldi; \
-    rmdir /var/opt/vivaldi 2>/dev/null || true
+    rm -rf /opt; \
+    ln -sf var/opt /opt
 
 # --- 7. Xbox controller driver (akmod-xpadneo), signed for Secure Boot -----
 # Everything needed only to *build* the module — kernel-devel, kernel-
