@@ -191,11 +191,26 @@ RUN ln -sf var/nix /nix
 # driver on a non-SELinux build host. Swapping in a plain, real /opt
 # directory for the duration of the install sidesteps the symlink
 # traversal entirely, regardless of the exact cause.
+#
+# vivaldi-stable's %post also backgrounds `nohup update-ffmpeg &`, which
+# downloads proprietary codecs into /var/opt/vivaldi/media-codecs-<ver>/ —
+# i.e. into this image's /var, not /opt. The RUN step ends mid-download,
+# leaving a real /var/opt/vivaldi directory (with a 0-byte partial
+# libffmpeg.so.XXXX) in the image; on the initial deployment that blocks
+# the tmpfiles symlink, so /opt/vivaldi/vivaldi doesn't exist and Vivaldi
+# can't launch. So kill the downloader and drop what it wrote. Codecs
+# can't live system-wide here anyway (/usr is read-only at runtime);
+# Vivaldi fetches them per-user into ~/.local/lib/vivaldi instead. The
+# tmpfiles rule is also `L+` so it replaces any such directory regardless.
 RUN set -eux; \
     rm -f /opt; \
     mkdir -p /opt; \
     dnf -y install vivaldi-stable; \
     dnf clean all; \
+    pkill -KILL -f update-ffmpeg || true; \
+    pkill -KILL -x curl || true; \
+    pkill -KILL -x wget || true; \
+    rm -rf /var/opt/vivaldi; \
     mkdir -p /usr/lib/opt; \
     mv /opt/vivaldi /usr/lib/opt/vivaldi; \
     rm -rf /opt; \
