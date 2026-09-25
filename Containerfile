@@ -205,22 +205,39 @@ RUN set -eux; \
 # Everything needed only to *build* the module — kernel-devel and
 # akmod-xpadneo itself (which pulls in akmods, kmodtool, rpm-build, gcc's
 # already-kept anyway) — is installed and removed again within this one
-# RUN instruction, so none of it ends up in the image. Only kernel-devel
-# is needed here, not kernel-headers: the out-of-tree module build uses
-# /usr/src/kernels/<version> from kernel-devel directly (that's what
-# akmods'/akmod-xpadneo's own package dependencies actually require —
-# neither lists kernel-headers), and kernel-headers is about userspace
-# UAPI headers, unrelated to building a kernel module. Worth avoiding
-# regardless: kernel-headers doesn't reliably ship in lockstep with
-# kernel-core/kernel-devel (confirmed on the source laptop, where they
-# were a full version apart), so pinning it to the same derived version
-# as kernel-devel can simply fail to resolve.
-# only the already-compiled, already-signed kmod-xpadneo-<kver> package
-# and the small xpadneo userspace package (udev rules, modprobe.d config —
-# built as a sibling RPM by the same akmods run) persist. That's also the
-# right behavior architecturally, not just a size trick: this image never
+# RUN instruction, so none of it ends up in the image: only the already-
+# compiled, already-signed kmod-xpadneo-<kver> package and the small
+# xpadneo userspace package (udev rules, modprobe.d config — built as a
+# sibling RPM by the same akmods run) persist. That's also the right
+# behavior architecturally, not just a size trick: this image never
 # rebuilds kernel modules client-side (see step 4's note), so there's no
 # ongoing use for the build toolchain after this step.
+#
+# Only kernel-devel is needed here, not kernel-headers: the out-of-tree
+# module build uses /usr/src/kernels/<version> from kernel-devel directly
+# (that's what akmods'/akmod-xpadneo's own package dependencies actually
+# require — neither lists kernel-headers), and kernel-headers is about
+# userspace UAPI headers, unrelated to building a kernel module. Worth
+# avoiding regardless: kernel-headers doesn't reliably ship in lockstep
+# with kernel-core/kernel-devel (confirmed on the source laptop, where
+# they were a full version apart), so pinning it to the same derived
+# version as kernel-devel can simply fail to resolve — and did, once,
+# in an earlier version of this build.
+#
+# akmod-xpadneo's own %post scriptlet tries to build the module inline,
+# immediately on install, and that attempt refuses to run as root
+# ("Not to be used as root; start as user or 'akmodsbuild' instead").
+# That's fine on a live system — the real build happens later, async,
+# via akmods.service running as the unprivileged akmods user — but a
+# Containerfile RUN is root, so this inline attempt fails every time
+# here and drags dnf's own exit code down with it, even though every
+# package still installs successfully (confirmed in the logs: the
+# scriptlet failure is logged as "non-critical" and package installation
+# continues to completion regardless). Tolerated with `|| true` on that
+# one install, immediately followed by an explicit `rpm -q` check so a
+# *genuine* install failure still fails the build loudly. The real build
+# — the one that actually matters, with signer verification — is the
+# explicit `akmods --force ...` call below, run separately.
 #
 # The private half of the MOK keypair is only ever available inside this
 # RUN instruction, via a build secret, and is deleted before the
@@ -231,7 +248,8 @@ COPY secureboot/MOK.der /usr/share/laptop-setup/MOK.der
 RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     set -eux; \
     KVER="$(rpm -q kernel-core --qf '%{version}-%{release}.%{arch}\n')"; \
-    dnf -y install "kernel-devel-${KVER}" akmod-xpadneo; \
+    dnf -y install "kernel-devel-${KVER}" akmod-xpadneo || true; \
+    rpm -q "kernel-devel-${KVER}" akmod-xpadneo >/dev/null || { echo "kernel-devel/akmod-xpadneo failed to install" >&2; exit 1; }; \
     install -D -m0444 /usr/share/laptop-setup/MOK.der /etc/pki/akmods/certs/public_key.der; \
     install -D -m0400 -o root -g akmods /run/secrets/mok_privkey /etc/pki/akmods/private/private_key.priv; \
     chown root:akmods /etc/pki/akmods/certs/public_key.der; \
