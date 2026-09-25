@@ -239,6 +239,13 @@ RUN set -eux; \
 # — the one that actually matters, with signer verification — is the
 # explicit `akmods --force ...` call below, run separately.
 #
+# The private key file is mode 0440 (root:akmods), not 0400 — the actual
+# signing (via akmodsbuild's brp-kmodsign) runs as the unprivileged
+# akmods user, same as the build itself, so it needs *group* read access;
+# 0400 only grants the owner (root) read and silently locked the akmods
+# user out, failing signing with an OpenSSL "Permission denied" that has
+# nothing to do with the key's actual validity.
+#
 # The private half of the MOK keypair is only ever available inside this
 # RUN instruction, via a build secret, and is deleted before the
 # instruction ends -- it is never written to an image layer. The public
@@ -251,7 +258,7 @@ RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     dnf -y install "kernel-devel-${KVER}" akmod-xpadneo || true; \
     rpm -q "kernel-devel-${KVER}" akmod-xpadneo >/dev/null || { echo "kernel-devel/akmod-xpadneo failed to install" >&2; exit 1; }; \
     install -D -m0444 /usr/share/laptop-setup/MOK.der /etc/pki/akmods/certs/public_key.der; \
-    install -D -m0400 -o root -g akmods /run/secrets/mok_privkey /etc/pki/akmods/private/private_key.priv; \
+    install -D -m0440 -o root -g akmods /run/secrets/mok_privkey /etc/pki/akmods/private/private_key.priv; \
     chown root:akmods /etc/pki/akmods/certs/public_key.der; \
     chmod 0750 /etc/pki/akmods/certs /etc/pki/akmods/private; \
     akmods --force --kernels "$KVER" --akmod xpadneo; \
