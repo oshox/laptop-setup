@@ -146,14 +146,28 @@ to bake into this image without you explicitly asking for it. Claude Code
 
 ## Updating
 
+`bootc-stage-updates.timer` runs weekly and stages whatever CI has most
+recently pushed to `ghcr.io/oshox/laptop-setup:latest` — it does not apply
+it. Nothing reboots on its own; the staged update takes effect at whatever
+reboot you next do (`sudo systemctl reboot`).
+
 ```
-sudo bootc upgrade --check   # see what's new
+systemctl list-timers bootc-stage-updates.timer   # see when it'll next run
+sudo systemctl start bootc-stage-updates.service  # trigger a check now
+journalctl -u bootc-stage-updates                 # see what it did
+sudo bootc status                                 # staged vs booted deployment
+```
+
+You can also drive it by hand instead, exactly as the timer does:
+
+```
+sudo bootc upgrade --check   # see what's new, without staging it
 sudo bootc upgrade && sudo systemctl reboot
 ```
 
-Nothing runs this automatically (`bootc-fetch-apply-updates.timer` stays
-disabled) — matching the source laptop, where the rpm-ostree auto-update
-timer was likewise inactive.
+If a staged update turns out to be bad after rebooting into it,
+`sudo bootc rollback && sudo systemctl reboot` goes back to the previous
+deployment.
 
 ## Rebuilding locally (for testing changes to this repo)
 

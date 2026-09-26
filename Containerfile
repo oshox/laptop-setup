@@ -327,6 +327,8 @@ COPY files/etc/firewalld/zones/public.xml /etc/firewalld/zones/public.xml
 COPY files/etc/firewalld/zones/trusted.xml /etc/firewalld/zones/trusted.xml
 COPY files/usr/lib/systemd/logind.conf.d/10-lid.conf /usr/lib/systemd/logind.conf.d/10-lid.conf
 COPY files/usr/lib/systemd/system/user@.service.d/delegate.conf /usr/lib/systemd/system/user@.service.d/delegate.conf
+COPY files/usr/lib/systemd/system/bootc-stage-updates.service /usr/lib/systemd/system/bootc-stage-updates.service
+COPY files/usr/lib/systemd/system/bootc-stage-updates.timer /usr/lib/systemd/system/bootc-stage-updates.timer
 COPY files/usr/lib/tmpfiles.d/vivaldi.conf /usr/lib/tmpfiles.d/vivaldi.conf
 COPY files/usr/share/sddm/themes/custom-theme /usr/share/sddm/themes/custom-theme
 
@@ -336,11 +338,16 @@ RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 # power-profiles-daemon is already enabled (step 3); tuned/tuned-ppd
 # already masked there too. Docker CE isn't installed at all here, so
 # there's no docker/containerd unit to leave disabled, unlike the source
-# laptop. bootc-fetch-apply-updates.timer stays disabled too — the source
-# laptop's rpm-ostree AutomaticUpdatePolicy is "stage" but its timer is
-# inactive, so updates there are effectively manual already (`bootc
-# upgrade` here). Base-image defaults (flatpak-add-fedora-repos.service
-# etc.) are untouched.
+# laptop. Base-image defaults (flatpak-add-fedora-repos.service etc.) are
+# untouched.
+#
+# bootc-fetch-apply-updates.timer (the stock timer) stays disabled: it runs
+# `bootc upgrade --apply`, which reboots unattended the moment an update is
+# staged. bootc-stage-updates.timer replaces it — same weekly cadence, but
+# `bootc upgrade` with no `--apply` only downloads and stages the new
+# deployment; it takes effect at whatever reboot you do next, and the
+# machine never reboots on its own.
+RUN systemctl enable bootc-stage-updates.timer
 
 # --- 11. Validate ------------------------------------------------------------
 RUN bootc container lint

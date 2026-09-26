@@ -1,0 +1,10 @@
+[Unit]
+Description=Stage a new bootc image update (does not apply it)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bootc upgrade --quiet
+Nice=19
+IOSchedulingClass=idle
