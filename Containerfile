@@ -92,7 +92,7 @@ RUN set -eux; \
 # kernel-devel is ~240MB on this laptop.
 RUN dnf -y install \
         alacritty alsa-lib-devel bat btop cargo clang cmake darktable \
-        fontconfig-devel gcc gcc-c++ gimp git glib2-devel \
+        fontconfig-devel gcc gcc-c++ gimp git gh glib2-devel \
         gtk-layer-shell-devel gtk3-devel gvfs-mtp \
         libva-devel libxcb-devel libxkbcommon-x11-devel make micro mpv \
         musl-gcc openssl-devel perf perl-File-Compare perl-File-Copy \
