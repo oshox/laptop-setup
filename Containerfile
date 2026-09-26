@@ -141,7 +141,7 @@ RUN dnf -y install yazi && dnf clean all
 # default (curated separately from the rest of nonfree) — enabled only for
 # this one transaction, not left on at runtime.
 #
-# gamescope and protonplus ride along here, both native RPMs too:
+# gamescope, protonplus, and lutris ride along here, all three native RPMs:
 #   - gamescope: Fedora's own `updates` repo, no extra repo needed. Used as
 #     Steam's per-game "Force the use of a specific Steam Play compatibility
 #     tool" / launch-option compositor (SteamOS-style), not the standalone
@@ -152,7 +152,15 @@ RUN dnf -y install yazi && dnf clean all
 #     it fetches lands in ~/.local/share/Steam/compatibilitytools.d, which
 #     is per-user data on /var/home like the Nix store (see step 5) — not
 #     baked into the image. Run it once at first login to pick a version.
-RUN dnf -y install deluge gamescope protonplus \
+#   - lutris: also Fedora's own `updates` repo (not RPM Fusion or Terra),
+#     no extra config needed to wire it up to the other two:
+#       - Lutris shows a "Use Gamescope" toggle per game (System options)
+#         whenever the `gamescope` binary is on PATH, which it is here.
+#       - Lutris scans ~/.local/share/Steam/compatibilitytools.d for
+#         GE-Proton/Wine-GE builds and lists them as selectable Wine/Proton
+#         runners (Runner options -> Wine version), i.e. it picks up
+#         whatever protonplus has fetched there with no extra pointing.
+RUN dnf -y install deluge gamescope lutris protonplus \
     && dnf -y --enablerepo=rpmfusion-nonfree-steam install steam \
     && dnf clean all
 
