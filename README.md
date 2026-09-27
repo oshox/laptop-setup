@@ -8,6 +8,13 @@ was generated from; the short version:
 - **No full-disk encryption.** Only the home directory is encrypted
   (systemd-homed, LUKS2), stored on the laptop's **second** SSD.
 - **Autologin disabled.**
+- **swayfx instead of stock sway** (Terra). A drop-in fork — same
+  `/usr/bin/sway`, same keybindings, same `sway-config-fedora`/
+  `sddm-wayland-sway`/`sway-systemd` integration — that adds rounded
+  corners, background blur, drop shadows, dim-inactive, and window
+  animations. The effect settings themselves live in the user's
+  `~/.config/sway/config` (see `migrate/home-include.txt`), not in this
+  repo; only the package swap is here.
 - **Not installed:** VS Code, Zed, and the mp3-tagging tools
   (puddletag, MusicBrainz Picard, beets).
 - **Steam and Deluge as native RPMs**, not flatpaks. Every other flatpak

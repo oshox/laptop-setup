@@ -22,7 +22,7 @@ FROM quay.io/fedora-ostree-desktops/sway-atomic:44
 # layered via rpm-ostree. The Vivaldi repo *file* is copied verbatim from
 # the source laptop's /etc/yum.repos.d. (Docker CE's repo is deliberately
 # not added — podman/toolbox are the only container runtime on this
-# machine; see step 4 below.)
+# machine; see step 5 below.)
 RUN set -eux; \
     FEDORA_VER="$(rpm -E %fedora)"; \
     dnf -y install \
@@ -57,7 +57,26 @@ RUN dnf -y config-manager setopt \
 # libswresample-free, libswscale-free).
 RUN dnf -y swap ffmpeg-free ffmpeg --allowerasing && dnf clean all
 
-# --- 3. Power profile daemon: power-profiles-daemon, not tuned-ppd ---------
+# --- 3. SwayFX instead of stock sway (Terra) --------------------------------
+# swayfx is sway itself (a fork, not a separate binary — it provides
+# `sway = 1.12` and installs to the same /usr/bin/sway), just built with
+# extra compositor eye-candy: rounded corners, background blur, drop
+# shadows, dim-inactive, and open/close/move animations. Tested first as a
+# transient `bootc usr-overlay` + `dnf swap` before landing here. Every
+# dependent that requires the base image's `sway` package (sway-config-
+# fedora, sddm-wayland-sway, sway-systemd, grimshot) is satisfied by the
+# capability swayfx provides too, so the swap doesn't pull any of those
+# out. scenefx is swayfx's own required rendering dependency.
+#
+# The actual effect settings (corner_radius, blur, shadows,
+# default_dim_inactive, animation_duration_ms, gaps) live in the user's
+# `~/.config/sway/config`, a per-user dotfile this repo doesn't store the
+# contents of — migrate/home-include.txt just lists `.config/sway/` as a
+# directory to carry over when migrating to a new laptop. Only the
+# package swap belongs here.
+RUN dnf -y swap sway swayfx && dnf clean all
+
+# --- 4. Power profile daemon: power-profiles-daemon, not tuned-ppd ---------
 # The base image (like the source laptop) defaults to tuned + tuned-ppd
 # (Fedora's default since F41 — tuned-ppd is a compatibility shim that
 # answers the power-profiles-daemon D-Bus API by translating it to tuned
@@ -77,15 +96,15 @@ RUN set -eux; \
     systemctl enable power-profiles-daemon.service; \
     systemctl mask tuned.service tuned-ppd.service
 
-# --- 4. Packages ---------------------------------------------------------------
+# --- 5. Packages ---------------------------------------------------------------
 # Fedora + updates
 #
 # Note: kernel-devel is NOT installed here. It's only needed to build the
-# xpadneo kernel module (step 7), never at runtime — unlike the source
+# xpadneo kernel module (step 8), never at runtime — unlike the source
 # laptop, this image never rebuilds kernel modules on the client (a new
 # kernel means a whole new bootc image, built centrally), so there's no
 # akmods.service here to keep it around for. Installing and removing it
-# within step 7's own RUN instruction, rather than leaving it installed
+# within step 8's own RUN instruction, rather than leaving it installed
 # here, is what actually keeps it out of the final image: an OCI layer's
 # diff is additive, so deleting a file in a *later* layer than the one
 # that added it doesn't shrink the image, it just hides the bytes.
@@ -128,10 +147,10 @@ RUN dnf -y install \
 RUN dnf -y install intel-media-driver && dnf clean all
 
 # Terra: yazi. (akmod-xpadneo is installed, built, and removed again
-# entirely within step 7 below — see the note in step 4 above.)
+# entirely within step 8 below — see the note in step 5 above.)
 RUN dnf -y install yazi && dnf clean all
 
-# Vivaldi is installed in step 6 below, not here — see that step's note.
+# Vivaldi is installed in step 7 below, not here — see that step's note.
 
 # Steam + Deluge as native packages, replacing every flatpak app the source
 # laptop had (Steam, Pithos, Obsidian, Deluge, Fedora Media Writer,
@@ -150,7 +169,7 @@ RUN dnf -y install yazi && dnf clean all
 #   - protonplus: Terra, a GTK4 app that downloads GE-Proton/Wine-GE
 #     releases. It only installs the *manager*; the actual GE-Proton build
 #     it fetches lands in ~/.local/share/Steam/compatibilitytools.d, which
-#     is per-user data on /var/home like the Nix store (see step 5) — not
+#     is per-user data on /var/home like the Nix store (see step 6) — not
 #     baked into the image. Run it once at first login to pick a version.
 #   - lutris: also Fedora's own `updates` repo (not RPM Fusion or Terra),
 #     no extra config needed to wire it up to the other two:
@@ -171,10 +190,10 @@ RUN dnf -y install deluge gamescope lutris protonplus \
 # docker-ce-cli/containerd.io/docker-compose-plugin) — podman/toolbox are
 # the only container runtime here, unlike the source laptop which has both
 # installed. Separately, kernel-devel/akmods/kmodtool/rpm-build are
-# installed *and removed* in step 7 below, purely as a means to build the
+# installed *and removed* in step 8 below, purely as a means to build the
 # signed xpadneo module — see the note there.
 
-# --- 5. Nix package manager mountpoint ------------------------------------
+# --- 6. Nix package manager mountpoint ------------------------------------
 # Only an empty /nix directory is baked into the image, as a mountpoint.
 # The store itself lives in /var/home/nix (persistent state that grows and
 # survives upgrades untouched — /var/home here is the second SSD) and is
@@ -192,7 +211,7 @@ RUN dnf -y install deluge gamescope lutris protonplus \
 # real directory that step is skipped and only the bind mount runs.
 RUN mkdir -p /nix
 
-# --- 6. Vivaldi, installed into a real /opt then relocated -----------------
+# --- 7. Vivaldi, installed into a real /opt then relocated -----------------
 # /opt is a symlink to /var/opt in bootc images, and unlike /usr, a fresh
 # image's /var content is only applied on the *initial* deployment, not on
 # later `bootc upgrade`s. So the real Vivaldi payload needs to end up in
@@ -235,7 +254,7 @@ RUN set -eux; \
     rm -rf /opt; \
     ln -sf var/opt /opt
 
-# --- 7. Xbox controller driver (akmod-xpadneo), signed for Secure Boot -----
+# --- 8. Xbox controller driver (akmod-xpadneo), signed for Secure Boot -----
 # Everything needed only to *build* the module — kernel-devel and
 # akmod-xpadneo itself (which pulls in akmods, kmodtool, rpm-build, gcc's
 # already-kept anyway) — is installed and removed again within this one
@@ -244,7 +263,7 @@ RUN set -eux; \
 # xpadneo userspace package (udev rules, modprobe.d config — built as a
 # sibling RPM by the same akmods run) persist. That's also the right
 # behavior architecturally, not just a size trick: this image never
-# rebuilds kernel modules client-side (see step 4's note), so there's no
+# rebuilds kernel modules client-side (see step 5's note), so there's no
 # ongoing use for the build toolchain after this step.
 #
 # Only kernel-devel is needed here, not kernel-headers: the out-of-tree
@@ -320,14 +339,14 @@ RUN --mount=type=secret,id=mok_privkey,target=/run/secrets/mok_privkey \
     SIGNER2="$(modinfo -F signer "$MODULE" 2>/dev/null || true)"; \
     test "$SIGNER2" = "$SIGNER" || { echo "hid_xpadneo module changed or disappeared after build-dep cleanup" >&2; exit 1; }
 
-# --- 8. authselect -----------------------------------------------------------
+# --- 9. authselect -----------------------------------------------------------
 # Same feature set as the source laptop, plus with-systemd-homed (needed for
 # pam_systemd_home so login/SDDM/swaylock/sudo work with the homed-managed
 # encrypted home).
 RUN authselect select local with-silent-lastlog with-mdns4 with-fingerprint \
         with-systemd-homed --force
 
-# --- 9. System config files (see files/ for the full tree) -----------------
+# --- 10. System config files (see files/ for the full tree) -----------------
 COPY files/etc/sudoers.d/10-wheel-nopasswd /etc/sudoers.d/10-wheel-nopasswd
 COPY files/etc/security/limits.d/nofile.conf /etc/security/limits.d/nofile.conf
 COPY files/etc/sddm.conf.d/10-custom-theme.conf /etc/sddm.conf.d/10-custom-theme.conf
@@ -342,8 +361,8 @@ COPY files/usr/share/sddm/themes/custom-theme /usr/share/sddm/themes/custom-them
 
 RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 
-# --- 10. Services ------------------------------------------------------------
-# power-profiles-daemon is already enabled (step 3); tuned/tuned-ppd
+# --- 11. Services ------------------------------------------------------------
+# power-profiles-daemon is already enabled (step 4); tuned/tuned-ppd
 # already masked there too. Docker CE isn't installed at all here, so
 # there's no docker/containerd unit to leave disabled, unlike the source
 # laptop. Base-image defaults (flatpak-add-fedora-repos.service etc.) are
@@ -357,5 +376,5 @@ RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 # machine never reboots on its own.
 RUN systemctl enable bootc-stage-updates.timer
 
-# --- 11. Validate ------------------------------------------------------------
+# --- 12. Validate ------------------------------------------------------------
 RUN bootc container lint
