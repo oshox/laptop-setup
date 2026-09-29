@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync lg-laptop fan_mode to the active power-profiles-daemon profile
+After=power-profiles-daemon.service dbus-broker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/laptop-setup/fan-profile-sync
+Restart=on-failure
+
+[Install]
+WantedBy=graphical.target

@@ -1,0 +1,33 @@
+#!/bin/bash
+# Keeps lg-laptop's fan_mode (see 99-fanmode.rules and thermal-conf.xml for
+# why Performance mode is needed under sustained load) in sync with the
+# active power-profiles-daemon profile: power-saver uses the firmware's default
+# Optimal (adaptive) mode, balanced/performance get Performance mode.
+set -euo pipefail
+
+fan_mode=/sys/devices/platform/lg-laptop/fan_mode
+iface=net.hadess.PowerProfiles
+path=/net/hadess/PowerProfiles
+
+apply() {
+	case "$1" in
+	power-saver) printf 0 >"$fan_mode" ;;
+	*) printf 2 >"$fan_mode" ;;
+	esac
+}
+
+current() {
+	busctl --system get-property "$iface" "$path" "$iface" ActiveProfile |
+		cut -d'"' -f2
+}
+
+apply "$(current)"
+
+busctl --system --json=short monitor "$iface" |
+	jq --unbuffered -r --arg path "$path" '
+		select(.path == $path and .member == "PropertiesChanged")
+		| .payload.data[1].ActiveProfile.data // empty
+	' |
+	while read -r profile; do
+		apply "$profile"
+	done

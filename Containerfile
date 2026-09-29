@@ -358,6 +358,12 @@ COPY files/usr/lib/systemd/system/bootc-stage-updates.service /usr/lib/systemd/s
 COPY files/usr/lib/systemd/system/bootc-stage-updates.timer /usr/lib/systemd/system/bootc-stage-updates.timer
 COPY files/usr/lib/tmpfiles.d/vivaldi.conf /usr/lib/tmpfiles.d/vivaldi.conf
 COPY files/usr/share/sddm/themes/custom-theme /usr/share/sddm/themes/custom-theme
+COPY files/etc/thermald/thermal-conf.xml /etc/thermald/thermal-conf.xml
+COPY files/usr/lib/systemd/system/thermald.service.d/10-no-adaptive.conf /usr/lib/systemd/system/thermald.service.d/10-no-adaptive.conf
+COPY files/usr/lib/laptop-setup/fan-profile-sync /usr/lib/laptop-setup/fan-profile-sync
+COPY files/usr/lib/systemd/system/fan-profile-sync.service /usr/lib/systemd/system/fan-profile-sync.service
+
+RUN chmod 0755 /usr/lib/laptop-setup/fan-profile-sync
 
 RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 
@@ -375,6 +381,11 @@ RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 # deployment; it takes effect at whatever reboot you do next, and the
 # machine never reboots on its own.
 RUN systemctl enable bootc-stage-updates.timer
+
+# fan-profile-sync: keeps lg-laptop's fan_mode aligned with whichever
+# power-profiles-daemon profile is active (see fan-profile-sync's own
+# comment and thermal-conf.xml's).
+RUN systemctl enable fan-profile-sync.service
 
 # --- 12. Validate ------------------------------------------------------------
 RUN bootc container lint
