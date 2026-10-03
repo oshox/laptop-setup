@@ -9,6 +9,8 @@
   <port port="36518" protocol="udp"/>
   <port port="4991" protocol="tcp"/>
   <port port="4991" protocol="udp"/>
+  <port port="3334" protocol="tcp"/>
+  <port port="3334" protocol="udp"/>
   <port port="8112" protocol="tcp"/>
   <forward/>
 </zone>

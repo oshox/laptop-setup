@@ -361,7 +361,13 @@ COPY files/usr/share/sddm/themes/custom-theme /usr/share/sddm/themes/custom-them
 COPY files/usr/lib/laptop-setup/fan-profile-sync /usr/lib/laptop-setup/fan-profile-sync
 COPY files/usr/lib/systemd/system/fan-profile-sync.service /usr/lib/systemd/system/fan-profile-sync.service
 
-RUN chmod 0755 /usr/lib/laptop-setup/fan-profile-sync
+# media-search: on-demand bitmagnet + prowlarr pod (quadlet) and deluge user
+# services, started with `systemctl --user start media-search`. Not enabled.
+COPY files/etc/containers/systemd/users/ /etc/containers/systemd/users/
+COPY files/usr/lib/systemd/user/ /usr/lib/systemd/user/
+COPY files/usr/lib/laptop-setup/media-search-provision /usr/lib/laptop-setup/media-search-provision
+
+RUN chmod 0755 /usr/lib/laptop-setup/fan-profile-sync /usr/lib/laptop-setup/media-search-provision
 
 RUN chmod 0440 /etc/sudoers.d/10-wheel-nopasswd && visudo -c
 

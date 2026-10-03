@@ -157,6 +157,32 @@ that's a third party repackaging a proprietary Electron app, not something
 to bake into this image without you explicitly asking for it. Claude Code
 (the CLI, above) covers the same account/functionality on Fedora today.
 
+## bitmagnet + prowlarr (on demand)
+
+Nothing here starts at login. One user unit brings the whole stack up and
+down:
+
+```
+systemctl --user start media-search   # deluge + pod (postgres, bitmagnet, prowlarr) + wiring
+systemctl --user stop media-search    # tears it all down
+```
+
+- Bitmagnet, its postgres and Prowlarr run as a rootless podman pod
+  (quadlet files in `/etc/containers/systemd/users/`); data lives in named
+  podman volumes in your home. Web UIs: bitmagnet <http://localhost:3333>,
+  Prowlarr <http://localhost:9696> (loopback only, no login).
+- On start, `media-search-provision` registers bitmagnet in Prowlarr as a
+  Torznab indexer (`http://localhost:3333/torznab`) and Deluge as a download
+  client (`host.containers.internal:8112`). It's idempotent; delete an entry
+  in Prowlarr and the next start re-adds it. Set `DELUGE_PASSWORD` in
+  `~/.config/media-search.env` if you changed deluge-web's default password
+  (`deluge`).
+- Deluge runs headless for this (`deluge-daemon` + `deluge-web` user
+  services, started and stopped with the stack). Don't use the Deluge GUI in
+  thin-client mode against it at the same time as classic mode.
+- Bitmagnet's DHT crawler uses port 3334 tcp/udp (opened in the public
+  firewalld zone). Expect the first results after it's been running a while.
+
 ## Updating
 
 `bootc-stage-updates.timer` runs weekly and stages whatever CI has most

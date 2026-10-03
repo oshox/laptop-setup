@@ -1,0 +1,18 @@
+[Unit]
+Description=media-search: postgres for bitmagnet
+PartOf=media-search.service
+
+[Container]
+ContainerName=media-search-postgres
+Image=docker.io/library/postgres:16-alpine
+Pod=media-search.pod
+Environment=POSTGRES_PASSWORD=bitmagnet
+Environment=POSTGRES_DB=bitmagnet
+Environment=PGDATA=/var/lib/postgresql/data/pgdata
+Volume=media-search-postgres:/var/lib/postgresql/data
+HealthCmd=pg_isready -U postgres
+HealthInterval=5s
+Notify=healthy
+
+[Service]
+Restart=on-failure

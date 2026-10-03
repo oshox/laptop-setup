@@ -1,0 +1,15 @@
+# On-demand entry point:  systemctl --user start|stop media-search
+# Starting it brings up deluge (daemon + web UI), the pod and its three
+# containers, then wires bitmagnet and deluge into prowlarr. Stopping it
+# tears everything down again. Nothing here is enabled at login.
+[Unit]
+Description=media-search stack (bitmagnet, prowlarr, deluge)
+Wants=media-search-pod.service media-search-postgres.service media-search-bitmagnet.service media-search-prowlarr.service deluge-daemon.service deluge-web.service
+After=media-search-pod.service media-search-postgres.service media-search-bitmagnet.service media-search-prowlarr.service deluge-daemon.service deluge-web.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=300
+EnvironmentFile=-%h/.config/media-search.env
+ExecStart=/usr/lib/laptop-setup/media-search-provision

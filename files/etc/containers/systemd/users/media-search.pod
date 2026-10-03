@@ -1,0 +1,14 @@
+# Shared network namespace for bitmagnet + its postgres + prowlarr, so they
+# reach each other on localhost. Only loopback-bound web UIs and bitmagnet's
+# DHT port are published. Not enabled at boot: start the whole stack via
+# `systemctl --user start media-search.service`.
+[Unit]
+Description=media-search pod (bitmagnet + prowlarr)
+PartOf=media-search.service
+
+[Pod]
+PodName=media-search
+PublishPort=127.0.0.1:3333:3333
+PublishPort=127.0.0.1:9696:9696
+PublishPort=3334:3334/tcp
+PublishPort=3334:3334/udp

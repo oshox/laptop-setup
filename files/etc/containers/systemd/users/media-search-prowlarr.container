@@ -1,0 +1,16 @@
+[Unit]
+Description=media-search: prowlarr
+PartOf=media-search.service
+
+[Container]
+ContainerName=media-search-prowlarr
+Image=lscr.io/linuxserver/prowlarr:latest
+Pod=media-search.pod
+Environment=TZ=Etc/UTC
+# Web UI is loopback-only, so skip the login screen.
+Environment=PROWLARR__AUTH__METHOD=External
+Environment=PROWLARR__AUTH__REQUIRED=DisabledForLocalAddresses
+Volume=media-search-prowlarr:/config
+
+[Service]
+Restart=on-failure

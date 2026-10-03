@@ -1,0 +1,16 @@
+[Unit]
+Description=media-search: bitmagnet (DHT crawler + torznab)
+After=media-search-postgres.service
+Requires=media-search-postgres.service
+PartOf=media-search.service
+
+[Container]
+ContainerName=media-search-bitmagnet
+Image=ghcr.io/bitmagnet-io/bitmagnet:latest
+Pod=media-search.pod
+Environment=POSTGRES_HOST=localhost
+Environment=POSTGRES_PASSWORD=bitmagnet
+Exec=worker run --keys=http_server --keys=queue_server --keys=dht_crawler
+
+[Service]
+Restart=on-failure

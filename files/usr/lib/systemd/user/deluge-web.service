@@ -1,0 +1,9 @@
+[Unit]
+Description=Deluge web UI (on demand)
+After=deluge-daemon.service
+Requires=deluge-daemon.service
+PartOf=media-search.service
+
+[Service]
+ExecStart=/usr/bin/deluge-web --do-not-daemonize
+Restart=on-failure

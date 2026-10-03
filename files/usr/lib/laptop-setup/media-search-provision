@@ -1,0 +1,51 @@
+#!/bin/bash
+# Idempotently registers bitmagnet (as a Torznab indexer) and deluge (as a
+# download client) in prowlarr. Run by media-search.service after the pod is
+# up. Optional ~/.config/media-search.env may set DELUGE_PASSWORD (deluge-web
+# default is "deluge").
+set -euo pipefail
+
+PROWLARR=http://127.0.0.1:9696
+BITMAGNET=http://127.0.0.1:3333
+DELUGE_HOST=host.containers.internal
+DELUGE_PORT=8112
+DELUGE_PASSWORD=${DELUGE_PASSWORD:-deluge}
+
+wait_for() { # description, command...
+    local what=$1; shift
+    for _ in $(seq 120); do "$@" &>/dev/null && return 0; sleep 1; done
+    echo "timed out waiting for $what" >&2; exit 1
+}
+
+wait_for prowlarr curl -fs "$PROWLARR/ping"
+wait_for bitmagnet curl -fs "$BITMAGNET/torznab/api?t=caps"
+wait_for deluge-web bash -c "exec 3<>/dev/tcp/127.0.0.1/$DELUGE_PORT"
+
+key=
+for _ in $(seq 30); do
+    key=$(podman exec media-search-prowlarr sed -n 's|.*<ApiKey>\(.*\)</ApiKey>.*|\1|p' /config/config.xml || true)
+    [ -n "$key" ] && break; sleep 1
+done
+[ -n "$key" ] || { echo "no prowlarr api key" >&2; exit 1; }
+
+api() { curl -fsS -H "X-Api-Key: $key" -H 'Content-Type: application/json' "$@"; }
+
+# $1 = collection (indexer|downloadclient), $2 = name, $3 = implementation,
+# $4 = jq filter applied to the schema entry
+ensure() {
+    if api "$PROWLARR/api/v1/$1" | jq -e --arg n "$2" 'any(.[]; .name == $n)' >/dev/null; then
+        echo "$2 already configured"; return
+    fi
+    api "$PROWLARR/api/v1/$1/schema" \
+      | jq --arg i "$3" --arg n "$2" "first(.[] | select(.implementation == \$i)) | .name = \$n | .enable = true | $4" \
+      | api -X POST --data @- "$PROWLARR/api/v1/$1" >/dev/null
+    echo "$2 added"
+}
+
+setf() { echo "(.fields[] | select(.name == \"$1\") | .value) = $2"; }
+
+ensure indexer Bitmagnet Torznab \
+    ".appProfileId = 1 | $(setf baseUrl '"http://localhost:3333/torznab"') | $(setf apiPath '"/api"')"
+
+ensure downloadclient Deluge Deluge \
+    "$(setf host "\"$DELUGE_HOST\"") | $(setf port "$DELUGE_PORT") | $(setf password "\"$DELUGE_PASSWORD\"")"

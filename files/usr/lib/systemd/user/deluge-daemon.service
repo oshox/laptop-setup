@@ -1,0 +1,7 @@
+[Unit]
+Description=Deluge daemon (on demand)
+PartOf=media-search.service
+
+[Service]
+ExecStart=/usr/bin/deluged --do-not-daemonize
+Restart=on-failure
